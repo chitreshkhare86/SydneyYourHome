@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSH | Sydney Master Directory & Travel Portal</title>
+    
+    <!-- Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+
+    <style>
+        :root { --apple-blue: #0071e3; --apple-bg: #f5f5f7; }
+        body { font-family: 'Plus Jakarta Sans', sans-emailserif; background-color: var(--apple-bg); color: #1d1d1f; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+        
+        .glass { background: rgba(255, 255, 255, 0.75); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
+        .page { display: none; min-height: 100vh; animation: pageIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .page.active { display: block; }
+        
+        @keyframes pageIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .card-shadow { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid rgba(0,0,0,0.03); }
+        .card-shadow:hover { transform: translateY(-8px); box-shadow: 0 24px 48px rgba(0,0,0,0.08); border-color: rgba(0,113,227,0.2); }
+        
+        .apple-btn { background: var(--apple-blue); color: white; border-radius: 980px; padding: 12px 24px; font-weight: 600; transition: 0.3s; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .apple-btn:hover { opacity: 0.9; transform: scale(1.02); }
+        .apple-btn:active { transform: scale(0.98); }
+
+        input, textarea, select { width: 100%; padding: 14px 20px; border-radius: 16px; border: 1px solid #d2d2d7; background: white; outline: none; transition: 0.2s; }
+        input:focus { border-color: var(--apple-blue); ring: 4px rgba(0, 113, 227, 0.1); }
+
+        .suggestion-box { position: absolute; top: 100%; left: 0; right: 0; margin-top: 8px; z-index: 100; border-radius: 18px; overflow: hidden; display: none; background: white; box-shadow: 0 12px 30px rgba(0,0,0,0.1); border: 1px solid #e5e5e7; }
+        .suggestion-item { padding: 12px 20px; cursor: pointer; transition: 0.2s; font-size: 14px; border-bottom: 1px solid #f5f5f7; }
+        .suggestion-item:hover { background: #f5f5f7; color: var(--apple-blue); }
+
+        .fav-heart { cursor: pointer; transition: 0.3s; color: rgba(0,0,0,0.15); }
+        .fav-heart.active { color: #ff3b30; }
+        
+        .hp-field { display: none !important; }
+        .star-rating { color: #ffcc00; }
+    </style>
+</head>
+<body onclick="closeAllSuggestions()">
+
+    <!-- OVERLAY: START -->
+    <div id="entry-overlay" class="fixed inset-0 z-[5000] glass flex items-center justify-center text-center p-6">
+        <div class="max-w-md">
+            <div class="w-24 h-24 bg-blue-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-200">
+                <i class="fa-solid fa-magnifying-glass-location text-4xl text-white"></i>
+            </div>
+            <h1 class="text-5xl font-extrabold tracking-tighter mb-4 italic">GSH Sydney</h1>
+            <p class="text-gray-500 mb-10 text-lg font-medium">Verified Residential & Commercial Directory for NSW Residents.</p>
+            <button onclick="app.init()" class="apple-btn w-full py-6 text-xl shadow-xl">Enter Directory</button>
+        </div>
+    </div>
+
+    <!-- MODAL: AUTH -->
+    <div id="auth-modal" class="fixed inset-0 z-[4000] hidden bg-black/10 backdrop-blur-md flex items-center justify-center p-6" onclick="ui.closeAuth()">
+        <div class="bg-white p-10 rounded-[40px] shadow-2xl max-w-sm w-full border border-gray-100" onclick="event.stopPropagation()">
+            <div id="login-view">
+                <h2 class="text-3xl font-extrabold mb-2 text-center">Sign In</h2>
+                <p class="text-center text-gray-400 text-xs font-black uppercase tracking-widest mb-8">Access Saved Listings</p>
+                <div class="space-y-4">
+                    <input type="text" id="login-user" placeholder="Username">
+                    <input type="password" id="login-pass" placeholder="Password">
+                    <button onclick="auth.login()" class="apple-btn w-full py-5 text-lg">Login</button>
+                    <button onclick="ui.toggleAuth('reg')" class="w-full text-sm font-bold text-blue-600 mt-4 underline">Create New Account</button>
+                </div>
+            </div>
+            <div id="register-view" class="hidden">
+                <h2 class="text-3xl font-extrabold mb-2 text-center">Create Account</h2>
+                <p class="text-center text-gray-400 text-xs font-black uppercase tracking-widest mb-8">Join the Directory</p>
+                <div class="space-y-4">
+                    <input type="text" id="reg-user" placeholder="Choose Username">
+                    <input type="password" id="reg-pass" placeholder="Create Password">
+                    <button onclick="auth.register()" class="apple-btn w-full py-5 text-lg">Register</button>
+                    <button onclick="ui.toggleAuth('login')" class="w-full text-sm font-bold text-blue-600 mt-4 underline">Back to Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav class="fixed top-0 w-full z-[100] glass border-b border-gray-200/50 h-20 flex items-center justify-between px-6 md:px-12">
+        <div class="flex items-center gap-10">
+            <button onclick="ui.showPage('home')" class="text-2xl font-black tracking-tighter hover:opacity-70 transition">GSH.</button>
+            <div class="hidden lg:flex gap-8 text-[11px] font-black uppercase tracking-widest text-gray-400">
+                <button onclick="ui.showPage('home')" class="hover:text-black transition">Explore</button>
+                <button onclick="ui.showPage('profile')" class="hover:text-black transition">My Favorites</button>
+                <button onclick="app.checkAdmin()" class="hover:text-black transition">Admin Panel</button>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div id="user-badge" class="hidden md:flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full border border-gray-200">
+                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span id="user-name-display" class="text-[10px] font-black uppercase tracking-widest">Guest Mode</span>
+            </div>
+            <button id="auth-nav-btn" onclick="ui.openAuth()" class="apple-btn px-6 py-2.5 text-xs">Login</button>
+        </div>
+    </nav>
+
+    <!-- PAGE: HOME -->
+    <main id="home-page" class="page active pt-32 pb-24">
+        <section class="max-w-6xl mx-auto px-6 mb-20 text-center">
+            <h1 class="text-6xl md:text-8xl font-extrabold tracking-tight mb-12">Find it in Sydney.</h1>
+            <div class="max-w-4xl mx-auto glass p-3 rounded-[32px] shadow-2xl border border-white flex flex-col md:flex-row items-center gap-3">
+                <div class="flex-1 relative w-full" onclick="event.stopPropagation()">
+                    <div class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"><i class="fa-solid fa-layer-group"></i></div>
+                    <input type="text" id="search-cat" placeholder="Category (Housing, Food...)" class="!bg-transparent !border-none pl-12 text-lg" onfocus="ui.handleSuggest('cat')" oninput="ui.handleSuggest('cat')">
+                    <div id="cat-suggest" class="suggestion-box"></div>
+                </div>
+                <div class="hidden md:block w-px h-8 bg-gray-200"></div>
+                <div class="flex-1 relative w-full" onclick="event.stopPropagation()">
+                    <div class="absolute left-5 top-1/2 -translate-y-1/2 text-blue-500"><i class="fa-solid fa-location-arrow"></i></div>
+                    <input type="text" id="search-sub" placeholder="Suburb (Parramatta...)" class="!bg-transparent !border-none pl-12 text-lg" onfocus="ui.handleSuggest('sub')" oninput="ui.handleSuggest('sub')">
+                    <div id="sub-suggest" class="suggestion-box"></div>
+                </div>
+                <button onclick="app.search()" class="apple-btn w-full md:w-auto px-10 py-5 text-lg">Search</button>
+            </div>
+        </section>
+
+        <section class="max-w-7xl mx-auto px-6">
+            <div id="main-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"></div>
+        </section>
+    </main>
+
+    <!-- PAGE: DETAIL -->
+    <main id="detail-page" class="page pt-32 pb-24">
+        <div class="max-w-6xl mx-auto px-6">
+            <button onclick="ui.showPage('home')" class="mb-10 text-blue-600 font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                <i class="fa-solid fa-chevron-left"></i> Back to search
+            </button>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-16">
+                <div class="lg:col-span-2">
+                    <img id="det-img" src="" class="w-full h-[500px] object-cover rounded-[48px] shadow-2xl mb-10 bg-white">
+                    <h2 id="det-title" class="text-6xl font-extrabold tracking-tighter mb-4"></h2>
+                    <p id="det-addr" class="text-2xl text-gray-400 font-medium mb-12"></p>
+                    
+                    <!-- NEW TRAVEL & LOCATION SECTION -->
+                    <div class="bg-blue-600 p-10 rounded-[48px] text-white mb-12 shadow-xl shadow-blue-100 flex flex-col md:flex-row justify-between items-center gap-8">
+                        <div>
+                            <h4 class="text-2xl font-bold mb-2">Check Distance</h4>
+                            <p class="text-blue-100 opacity-80 mb-6">See how far this location is from you right now.</p>
+                            <div id="dist-result" class="text-3xl font-black tracking-tight mb-4 hidden"></div>
+                            <button id="calc-dist-btn" onclick="app.calculateDistance()" class="bg-white text-blue-600 px-8 py-4 rounded-full font-bold hover:bg-blue-50 transition flex items-center gap-2">
+                                <i class="fa-solid fa-location-crosshairs"></i> Get Current Distance
+                            </button>
+                        </div>
+                        <div class="w-full md:w-auto">
+                            <button onclick="app.getDirections()" class="w-full md:w-auto bg-black/20 backdrop-blur text-white border border-white/30 px-8 py-8 rounded-3xl font-bold hover:bg-black/30 transition flex flex-col items-center gap-2">
+                                <i class="fa-solid fa-diamond-turn-right text-3xl"></i>
+                                <span>Get Directions</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-12">
+                        <div class="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
+                            <i class="fa-solid fa-shield-check text-blue-600 mb-4 text-2xl"></i>
+                            <h5 class="font-bold">Verified Provider</h5>
+                            <p class="text-sm text-gray-500">Documented & Hand-checked by GSH Sydney Admin.</p>
+                        </div>
+                        <div class="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
+                            <i class="fa-solid fa-clock text-green-500 mb-4 text-2xl"></i>
+                            <h5 class="font-bold">Fast Response</h5>
+                            <p class="text-sm text-gray-500">Typically responds within 4 business hours.</p>
+                        </div>
+                    </div>
+
+                    <!-- REVIEWS SECTION -->
+                    <div class="mt-20">
+                        <h3 class="text-4xl font-extrabold tracking-tight mb-8">Community Reviews</h3>
+                        <div id="approved-reviews-list" class="space-y-6 mb-12"></div>
+
+                        <!-- Review Form -->
+                        <div id="review-form-container" class="bg-white p-10 rounded-[40px] border border-gray-100">
+                            <div id="logged-in-review">
+                                <h4 class="text-xl font-bold mb-2">Leave a Review</h4>
+                                <p class="text-sm text-gray-500 mb-6">Your review will be public after admin approval.</p>
+                                <div class="space-y-4">
+                                    <select id="rev-rating" class="font-bold text-blue-600">
+                                        <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                                        <option value="4">⭐⭐⭐⭐ Very Good</option>
+                                        <option value="3">⭐⭐⭐ Average</option>
+                                        <option value="2">⭐⭐ Poor</option>
+                                        <option value="1">⭐ Terrible</option>
+                                    </select>
+                                    <textarea id="rev-text" placeholder="Share your experience..." class="h-32 resize-none"></textarea>
+                                    <button onclick="app.submitReview()" class="apple-btn px-10">Post Review</button>
+                                </div>
+                            </div>
+                            <div id="logged-out-review" class="hidden text-center py-4">
+                                <p class="font-bold text-gray-500">Please <button onclick="ui.openAuth()" class="text-blue-600 underline">Login</button> to leave a review.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-8">
+                    <div class="bg-white p-8 rounded-[40px] shadow-xl border border-gray-100">
+                        <h3 class="text-center font-black text-xs uppercase tracking-widest text-blue-600 mb-8">Send Inquiry</h3>
+                        <form id="inquiry-form" class="space-y-4">
+                            <input type="text" name="user_bot_check" class="hp-field">
+                            <input type="text" id="inq-name" placeholder="Full Name" required>
+                            <input type="email" id="inq-email" placeholder="Email Address" required>
+                            <textarea id="inq-msg" placeholder="Tell them what you need..." class="h-32 resize-none" required></textarea>
+                            <div class="bg-gray-50 p-4 rounded-2xl flex items-center justify-between border border-gray-100">
+                                <span id="captcha-txt" class="text-[10px] font-black uppercase text-gray-400"></span>
+                                <input type="number" id="captcha-ans" placeholder="?" class="w-20 py-2 text-center font-bold">
+                            </div>
+                            <button type="button" id="inq-btn" onclick="app.submitInquiry()" class="apple-btn w-full py-5 text-lg">Send Application</button>
+                        </form>
+                    </div>
+                    <button id="det-fav-btn" onclick="app.toggleFavoriteCurrent()" class="w-full py-5 rounded-full border-2 border-gray-100 font-bold text-sm uppercase tracking-widest hover:bg-gray-50 transition">
+                        Add to Favorites
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- PAGE: PROFILE -->
+    <main id="profile-page" class="page pt-32 pb-24">
+        <div class="max-w-6xl mx-auto px-6">
+            <h2 class="text-6xl font-extrabold tracking-tighter text-center mb-16 italic">My Saved Places.</h2>
+            <div id="fav-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"></div>
+        </div>
+    </main>
+
+    <!-- PAGE: ADMIN -->
+    <main id="admin-page" class="page pt-32 pb-24">
+        <div class="max-w-5xl mx-auto px-6">
+            <div class="flex justify-between items-end mb-16">
+                <h2 class="text-6xl font-extrabold tracking-tighter">Admin Dashboard</h2>
+                <button onclick="auth.logout()" class="px-6 py-2 bg-red-50 text-red-600 rounded-full font-black text-[10px] uppercase">Secure Sign Out</button>
+            </div>
+            
+            <div class="grid grid-cols-1 gap-12">
+                <div class="glass p-10 rounded-[48px] border border-white">
+                    <h4 class="text-xl font-bold mb-8 flex items-center gap-3">
+                        <i class="fa-solid fa-inbox text-blue-600"></i> Inquiry Feed
+                    </h4>
+                    <div id="admin-feed" class="space-y-4"></div>
+                </div>
+
+                <div class="glass p-10 rounded-[48px] border border-white">
+                    <h4 class="text-xl font-bold mb-8 flex items-center gap-3">
+                        <i class="fa-solid fa-star text-yellow-500"></i> Review Moderation
+                    </h4>
+                    <div id="admin-review-moderation" class="space-y-4"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[9999] glass px-10 py-5 rounded-full border border-gray-200 shadow-2xl opacity-0 translate-y-20 transition-all duration-500 pointer-events-none text-sm font-black uppercase tracking-widest text-blue-600"></div>
+
+    <script>
+        const CONFIG = {
+            suburbs: ["Parramatta", "Harris Park", "Sydney CBD", "Kensington", "Newtown", "Redfern", "Haymarket", "Ryde", "Strathfield"],
+            cats: ["Housing", "Food", "Grocery", "Service"],
+            imgs: {
+                Housing: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?q=80&w=800",
+                Food: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800",
+                Grocery: "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800",
+                Service: "https://images.unsplash.com/photo-1521791136064-7986c2959210?q=80&w=800"
+            }
+        };
+
+        const state = {
+            businesses: [],
+            users: JSON.parse(localStorage.getItem('gsh_users')) || [],
+            currentUser: JSON.parse(sessionStorage.getItem('gsh_session')) || null,
+            enquiries: JSON.parse(localStorage.getItem('gsh_enquiries')) || [],
+            reviews: JSON.parse(localStorage.getItem('gsh_reviews')) || [],
+            activeBiz: null,
+            captcha: 0
+        };
+
+        const dataEngine = {
+            generate() {
+                let list = [];
+                CONFIG.cats.forEach(c => {
+                    for(let i=1; i<=12; i++) {
+                        const sub = CONFIG.suburbs[(i + c.length) % CONFIG.suburbs.length];
+                        list.push({
+                            id: `${c.toLowerCase()}-${i}`,
+                            name: `${sub} ${c} Center ${i}`,
+                            cat: c,
+                            sub: sub,
+                            addr: `${i * 14} George St, ${sub} NSW`,
+                            img: CONFIG.imgs[c],
+                            // MOCK COORDINATES centered around Sydney area
+                            lat: -33.8 + (Math.random() * 0.2 - 0.1),
+                            lng: 151.1 + (Math.random() * 0.2 - 0.1)
+                        });
+                    }
+                });
+                state.businesses = list;
+            }
+        };
+
+        const auth = {
+            register() {
+                const u = document.getElementById('reg-user').value.trim();
+                const p = document.getElementById('reg-pass').value;
+                if(!u || !p) return ui.toast("Enter all fields");
+                if(state.users.find(x => x.id === u)) return ui.toast("Username taken");
+                
+                state.users.push({ id: u, pass: btoa(p), favs: [] });
+                localStorage.setItem('gsh_users', JSON.stringify(state.users));
+                ui.toast("Account Created! Please Login.");
+                ui.toggleAuth('login');
+            },
+            login() {
+                const u = document.getElementById('login-user').value.trim();
+                const p = document.getElementById('login-pass').value;
+
+                if(u === 'Admin' && p === 'Qwert@123') {
+                    state.currentUser = { id: 'Admin', role: 'ADMIN' };
+                    return this.finalizeLogin();
+                }
+
+                const found = state.users.find(x => x.id === u && x.pass === btoa(p));
+                if(found) {
+                    state.currentUser = { id: found.id, role: 'USER', favs: found.favs || [] };
+                    this.finalizeLogin();
+                } else {
+                    ui.toast("Invalid Credentials");
+                }
+            },
+            finalizeLogin() {
+                sessionStorage.setItem('gsh_session', JSON.stringify(state.currentUser));
+                ui.closeAuth();
+                ui.updateGlobalNav();
+                ui.toast(`Welcome, ${state.currentUser.id}`);
+                if(state.currentUser.role === 'ADMIN') ui.showPage('admin');
+                else if(document.getElementById('detail-page').classList.contains('active')) ui.refreshReviewUI();
+            },
+            logout() {
+                if(state.currentUser && state.currentUser.role === 'USER') {
+                    const idx = state.users.findIndex(x => x.id === state.currentUser.id);
+                    state.users[idx].favs = state.currentUser.favs;
+                    localStorage.setItem('gsh_users', JSON.stringify(state.users));
+                }
+                state.currentUser = null;
+                sessionStorage.removeItem('gsh_session');
+                ui.updateGlobalNav();
+                ui.showPage('home');
+                ui.toast("Logged Out");
+            }
+        };
+
+        const ui = {
+            showPage(id) {
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById(`${id}-page`).classList.add('active');
+                window.scrollTo(0,0);
+                if(id === 'home') app.search();
+                if(id === 'profile') this.renderFavorites();
+                if(id === 'admin') {
+                    this.renderAdminFeed();
+                    this.renderModerationFeed();
+                }
+                if(id === 'detail') {
+                    this.refreshReviewUI();
+                    document.getElementById('dist-result').classList.add('hidden');
+                    document.getElementById('calc-dist-btn').innerText = "Get Current Distance";
+                }
+            },
+            updateGlobalNav() {
+                const btn = document.getElementById('auth-nav-btn');
+                const badge = document.getElementById('user-name-display');
+                if(state.currentUser) {
+                    btn.innerText = "Logout";
+                    btn.onclick = () => auth.logout();
+                    badge.innerText = state.currentUser.id;
+                } else {
+                    btn.innerText = "Login";
+                    btn.onclick = () => this.openAuth();
+                    badge.innerText = "Guest Mode";
+                }
+            },
+            refreshReviewUI() {
+                const loggedIn = document.getElementById('logged-in-review');
+                const loggedOut = document.getElementById('logged-out-review');
+                if(state.currentUser && state.currentUser.role === 'USER') {
+                    loggedIn.classList.remove('hidden');
+                    loggedOut.classList.add('hidden');
+                } else {
+                    loggedIn.classList.add('hidden');
+                    loggedOut.classList.remove('hidden');
+                }
+                this.renderApprovedReviews();
+            },
+            renderApprovedReviews() {
+                const list = document.getElementById('approved-reviews-list');
+                const filtered = state.reviews.filter(r => r.bizId === state.activeBiz.id && r.status === 'approved');
+                list.innerHTML = filtered.length ? '' : '<p class="text-gray-400 italic">No reviews yet. Be the first!</p>';
+                filtered.forEach(r => {
+                    list.innerHTML += `
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-bold text-gray-900">${r.userName}</span>
+                                <span class="star-rating">${'⭐'.repeat(r.rating)}</span>
+                            </div>
+                            <p class="text-gray-600 text-sm">"${r.text}"</p>
+                            <p class="text-[10px] text-gray-300 mt-4 uppercase font-bold">${r.date}</p>
+                        </div>
+                    `;
+                });
+            },
+            renderModerationFeed() {
+                const feed = document.getElementById('admin-review-moderation');
+                const pending = state.reviews.filter(r => r.status === 'pending');
+                feed.innerHTML = pending.length ? '' : '<p class="text-center py-10 text-gray-400">No reviews pending moderation.</p>';
+                pending.forEach(r => {
+                    feed.innerHTML += `
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-[10px] font-black text-blue-600 uppercase mb-1 block">Review for: ${r.bizName}</span>
+                                    <h5 class="font-bold">${r.userName} <span class="star-rating ml-2">${'⭐'.repeat(r.rating)}</span></h5>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="app.moderateReview('${r.id}', 'approved')" class="bg-green-100 text-green-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">Approve</button>
+                                    <button onclick="app.moderateReview('${r.id}', 'delete')" class="bg-red-100 text-red-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">Delete</button>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-3 italic bg-gray-50 p-4 rounded-2xl">"${r.text}"</p>
+                        </div>
+                    `;
+                });
+            },
+            renderGrid(data, targetId) {
+                const container = document.getElementById(targetId);
+                container.innerHTML = data.length ? '' : '<p class="col-span-full py-20 text-center text-gray-400 font-bold">No matching results found.</p>';
+                data.forEach(b => {
+                    const isFav = state.currentUser && state.currentUser.favs?.includes(b.id);
+                    const el = document.createElement('div');
+                    el.className = "glass p-5 rounded-[40px] card-shadow cursor-pointer relative group";
+                    el.onclick = () => app.openDetail(b.id);
+                    el.innerHTML = `
+                        <div class="absolute top-8 right-8 z-10 text-2xl" onclick="event.stopPropagation(); app.toggleFav('${b.id}')">
+                            <i class="fa-solid fa-heart fav-heart ${isFav ? 'active' : ''}"></i>
+                        </div>
+                        <img src="${b.img}" class="w-full h-44 object-cover rounded-[28px] mb-5 bg-gray-100">
+                        <span class="text-blue-600 text-[10px] font-black uppercase tracking-widest">${b.cat}</span>
+                        <h4 class="font-extrabold text-lg mt-1 truncate">${b.name}</h4>
+                        <p class="text-xs text-gray-400 font-bold mt-1"><i class="fa-solid fa-location-dot mr-1"></i> ${b.sub}</p>
+                    `;
+                    container.appendChild(el);
+                });
+            },
+            renderFavorites() {
+                if(!state.currentUser) return this.showPage('home'), this.openAuth();
+                const favs = state.businesses.filter(b => state.currentUser.favs?.includes(b.id));
+                this.renderGrid(favs, 'fav-grid');
+            },
+            renderAdminFeed() {
+                const feed = document.getElementById('admin-feed');
+                feed.innerHTML = state.enquiries.length ? '' : '<p class="text-center py-20 text-gray-400">Inbox is empty</p>';
+                state.enquiries.forEach((enq, i) => {
+                    feed.innerHTML += `
+                        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative group">
+                            <button onclick="app.deleteEnq(${i})" class="absolute top-6 right-6 text-gray-200 hover:text-red-500 transition"><i class="fa-solid fa-trash"></i></button>
+                            <span class="text-[10px] font-black text-blue-600 uppercase mb-1 block">${enq.biz}</span>
+                            <h5 class="font-bold text-gray-900">${enq.name} <span class="text-xs font-normal text-gray-400 ml-2">${enq.email}</span></h5>
+                            <p class="text-sm text-gray-600 mt-3 italic bg-gray-50 p-4 rounded-2xl">"${enq.msg}"</p>
+                            <p class="text-[9px] text-gray-300 mt-4 font-bold uppercase tracking-widest">${enq.date}</p>
+                        </div>
+                    `;
+                });
+            },
+            handleSuggest(type) {
+                const input = document.getElementById(`search-${type}`);
+                const box = document.getElementById(`${type}-suggest`);
+                const val = input.value.toLowerCase();
+                const list = type === 'cat' ? CONFIG.cats : CONFIG.suburbs;
+                const filtered = list.filter(x => x.toLowerCase().includes(val));
+                box.innerHTML = '';
+                if(filtered.length > 0) {
+                    box.style.display = 'block';
+                    filtered.forEach(item => {
+                        const d = document.createElement('div');
+                        d.className = 'suggestion-item';
+                        d.innerText = item;
+                        d.onclick = () => { input.value = item; box.style.display = 'none'; app.search(); };
+                        box.appendChild(d);
+                    });
+                } else { box.style.display = 'none'; }
+            },
+            toast(msg) {
+                const t = document.getElementById('toast');
+                t.innerText = msg;
+                t.classList.remove('opacity-0', 'translate-y-20');
+                setTimeout(() => t.classList.add('opacity-0', 'translate-y-20'), 3000);
+            },
+            openAuth() { document.getElementById('auth-modal').classList.remove('hidden'); },
+            closeAuth() { document.getElementById('auth-modal').classList.add('hidden'); },
+            toggleAuth(view) {
+                document.getElementById('login-view').classList.toggle('hidden', view === 'reg');
+                document.getElementById('register-view').classList.toggle('hidden', view === 'login');
+            }
+        };
+
+        const app = {
+            init() {
+                emailjs.init("666znJ3zN_RPXJRrM"); 
+                dataEngine.generate();
+                ui.updateGlobalNav();
+                this.search();
+                this.refreshCaptcha();
+                document.getElementById('entry-overlay').style.display = 'none';
+                window.addEventListener('keypress', (e) => {
+                    if(e.key === 'Enter' && document.getElementById('home-page').classList.contains('active')) this.search();
+                });
+            },
+            // DISTANCE LOGIC
+            calculateDistance() {
+                const btn = document.getElementById('calc-dist-btn');
+                const res = document.getElementById('dist-result');
+                
+                if (!navigator.geolocation) return ui.toast("Geolocation not supported");
+
+                btn.innerText = "Locating...";
+                
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const userLat = pos.coords.latitude;
+                    const userLng = pos.coords.longitude;
+                    const bizLat = state.activeBiz.lat;
+                    const bizLng = state.activeBiz.lng;
+
+                    // Haversine Formula
+                    const R = 6371; // Earth Radius in KM
+                    const dLat = (bizLat - userLat) * Math.PI / 180;
+                    const dLon = (bizLng - userLng) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                              Math.cos(userLat * Math.PI / 180) * Math.cos(bizLat * Math.PI / 180) * 
+                              Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    const distance = (R * c).toFixed(1);
+
+                    res.innerText = `${distance} KM away`;
+                    res.classList.remove('hidden');
+                    btn.innerText = "Recalculate Distance";
+                }, () => {
+                    ui.toast("Location access denied");
+                    btn.innerText = "Get Current Distance";
+                });
+            },
+            getDirections() {
+                const url = `https://www.google.com/maps/dir/?api=1&destination=${state.activeBiz.lat},${state.activeBiz.lng}`;
+                window.open(url, '_blank');
+            },
+            submitReview() {
+                const text = document.getElementById('rev-text').value.trim();
+                const rating = parseInt(document.getElementById('rev-rating').value);
+                if(!text) return ui.toast("Please enter a comment");
+                const newReview = {
+                    id: 'rev-' + Date.now(),
+                    bizId: state.activeBiz.id,
+                    bizName: state.activeBiz.name,
+                    userId: state.currentUser.id,
+                    userName: state.currentUser.id,
+                    rating: rating,
+                    text: text,
+                    date: new Date().toLocaleDateString(),
+                    status: 'pending'
+                };
+                state.reviews.push(newReview);
+                localStorage.setItem('gsh_reviews', JSON.stringify(state.reviews));
+                document.getElementById('rev-text').value = '';
+                ui.toast("Review submitted for moderation!");
+            },
+            moderateReview(id, action) {
+                const idx = state.reviews.findIndex(r => r.id === id);
+                if(idx === -1) return;
+                if(action === 'approved') {
+                    state.reviews[idx].status = 'approved';
+                    ui.toast("Review Approved");
+                } else {
+                    state.reviews.splice(idx, 1);
+                    ui.toast("Review Deleted");
+                }
+                localStorage.setItem('gsh_reviews', JSON.stringify(state.reviews));
+                ui.renderModerationFeed();
+            },
+            search() {
+                const c = document.getElementById('search-cat').value.toLowerCase();
+                const s = document.getElementById('search-sub').value.toLowerCase();
+                const filtered = state.businesses.filter(b => 
+                    (b.cat.toLowerCase().includes(c) || b.name.toLowerCase().includes(c)) &&
+                    (b.sub.toLowerCase().includes(s))
+                );
+                ui.renderGrid(filtered, 'main-grid');
+            },
+            openDetail(id) {
+                state.activeBiz = state.businesses.find(x => x.id === id);
+                document.getElementById('det-img').src = state.activeBiz.img;
+                document.getElementById('det-title').innerText = state.activeBiz.name;
+                document.getElementById('det-addr').innerText = state.activeBiz.addr;
+                this.updateDetailFavBtn();
+                ui.showPage('detail');
+            },
+            toggleFav(id) {
+                if(!state.currentUser) return ui.openAuth();
+                if(state.currentUser.role === 'ADMIN') return ui.toast("Admins can't favorite");
+                const idx = state.currentUser.favs.indexOf(id);
+                if(idx > -1) {
+                    state.currentUser.favs.splice(idx, 1);
+                    ui.toast("Removed from Favorites");
+                } else {
+                    state.currentUser.favs.push(id);
+                    ui.toast("Saved to Favorites");
+                }
+                sessionStorage.setItem('gsh_session', JSON.stringify(state.currentUser));
+                this.updateDetailFavBtn();
+                if(document.getElementById('home-page').classList.contains('active')) this.search();
+                if(document.getElementById('profile-page').classList.contains('active')) ui.renderFavorites();
+            },
+            toggleFavoriteCurrent() {
+                if(state.activeBiz) this.toggleFav(state.activeBiz.id);
+            },
+            updateDetailFavBtn() {
+                const btn = document.getElementById('det-fav-btn');
+                const isFav = state.currentUser && state.currentUser.favs?.includes(state.activeBiz?.id);
+                btn.innerText = isFav ? "Remove Favorite" : "Add to Favorites";
+                btn.classList.toggle('bg-red-50', isFav);
+                btn.classList.toggle('text-red-600', isFav);
+            },
+           async submitInquiry() {
+                const form = document.getElementById('inquiry-form');
+                const btn = document.getElementById('inq-btn');
+                if(form.elements['user_bot_check'].value !== "") return;
+                const ans = parseInt(document.getElementById('captcha-ans').value);
+                if(ans !== state.captcha) return ui.toast("Captcha Incorrect");
+                if(!state.activeBiz) return ui.toast("Error: No business selected.");
+                const userEmail = document.getElementById('inq-email').value.trim();
+                const userName = document.getElementById('inq-name').value.trim();
+                const userMsg = document.getElementById('inq-msg').value.trim();
+                if(!userEmail) return ui.toast("Please enter your email address.");
+                const data = {
+                    biz: state.activeBiz.name,
+                    name: userName,
+                    email: userEmail,
+                    msg: userMsg,
+                    date: new Date().toLocaleString()
+                };
+                btn.disabled = true;
+                btn.innerText = "Sending...";
+                try {
+                    await emailjs.send("service_s1fwnoc", "template_q03869r", {
+                        from_name: data.name,
+                        to_name: "GSH Admin",
+                        business_name: data.biz,
+                        message: data.msg,
+                        reply_to: data.email 
+                    });
+                    await emailjs.send("service_s1fwnoc", "template_i3soihr", {
+                        recipient_email: data.email,
+                        user_name: data.name,
+                        business_name: data.biz,
+                        message_copy: data.msg
+                    });
+                    state.enquiries.unshift(data);
+                    localStorage.setItem('gsh_enquiries', JSON.stringify(state.enquiries));
+                    ui.toast("Application Sent! Check your email.");
+                    form.reset();
+                } catch (err) {
+                    ui.toast("Service Error. Please try again later.");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "Send Application";
+                    this.refreshCaptcha();
+                }
+            },
+            deleteEnq(idx) {
+                state.enquiries.splice(idx, 1);
+                localStorage.setItem('gsh_enquiries', JSON.stringify(state.enquiries));
+                ui.renderAdminFeed();
+            },
+            refreshCaptcha() {
+                const a = Math.floor(Math.random() * 9);
+                const b = Math.floor(Math.random() * 9);
+                state.captcha = a + b;
+                document.getElementById('captcha-txt').innerText = `Security: ${a} + ${b} =`;
+            },
+            checkAdmin() {
+                if(state.currentUser?.role === 'ADMIN') ui.showPage('admin');
+                else ui.openAuth();
+            }
+        };
+
+        function closeAllSuggestions() {
+            document.querySelectorAll('.suggestion-box').forEach(b => b.style.display = 'none');
+        }
+    </script>
+</body>
+</html>
